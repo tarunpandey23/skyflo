@@ -1,0 +1,57 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: skyflo-ai
+
+labels:
+  - includeSelectors: true
+    includeTemplates: true
+    pairs:
+      app.kubernetes.io/part-of: skyflo-ai
+      app.kubernetes.io/managed-by: kustomize
+
+resources:
+  - cluster/namespace.yaml
+  - cluster/crd.yaml
+  - cluster/rbac.yaml
+  - config/configmaps/version-configmap.yaml
+  - config/configmaps/engine-configmap.yaml
+  - config/configmaps/mcp-configmap.yaml
+  - config/configmaps/ui-configmap.yaml
+  - config/secrets/engine-secrets.yaml
+  - config/secrets/postgres-secrets.yaml
+  - network/service/redis-headless.yaml
+  - network/service/redis.yaml
+  - network/service/postgres-headless.yaml
+  - network/service/postgres.yaml
+  - network/service/ui.yaml
+  - network/service/engine.yaml
+  - workload/controller.yaml
+  - workload/redis.yaml
+  - workload/postgres.yaml
+  - workload/ui.yaml
+  - workload/engine.yaml
+
+# Replica counts for Deployments/StatefulSets (change here to scale).
+replicas:
+  - name: skyflo-ai-controller
+    count: 1
+  - name: skyflo-ai-engine
+    count: 1
+  - name: skyflo-ai-ui
+    count: 1
+  - name: skyflo-ai-redis
+    count: 1
+  - name: skyflo-ai-postgres
+    count: 1
+
+# Single place to change image tags (keep version-configmap VERSION in sync).
+images:
+  - name: skyfloaiagent/k8s-controller
+    newTag: v0.5.0
+  - name: skyfloaiagent/engine
+    newTag: v0.5.0
+  - name: skyfloaiagent/ui
+    newTag: v0.5.0
+  - name: skyfloaiagent/proxy
+    newTag: v0.5.0

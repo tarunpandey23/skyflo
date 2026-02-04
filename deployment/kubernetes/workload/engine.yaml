@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skyflo-ai-engine
+  namespace: skyflo-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: skyflo-ai-engine
+  template:
+    metadata:
+      labels:
+        app: skyflo-ai-engine
+    spec:
+      containers:
+      - name: engine
+        image: skyfloaiagent/engine:v0.5.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: skyflo-engine-config
+        - secretRef:
+            name: skyflo-engine-secrets
+        env:
+        - name: APP_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: skyflo-version
+              key: VERSION
+        - name: INTEGRATIONS_SECRET_NAMESPACE
+          value: "skyflo-ai"
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: http
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: http
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsUser: 1002
+          runAsGroup: 1002
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        runAsNonRoot: true
+      terminationGracePeriodSeconds: 10

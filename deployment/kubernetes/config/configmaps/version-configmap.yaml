@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skyflo-version
+  namespace: skyflo-ai
+data:
+  VERSION: "v0.5.0"

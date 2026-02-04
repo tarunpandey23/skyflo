@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: skyflo-ai-ui
+  namespace: skyflo-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: skyflo-ai-ui
+  template:
+    metadata:
+      labels:
+        app: skyflo-ai-ui
+    spec:
+      containers:
+      - name: ui
+        image: skyfloaiagent/ui:v0.5.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: skyflo-ui-config
+        env:
+        - name: APP_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: skyflo-version
+              key: VERSION
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsUser: 1002
+          runAsGroup: 1002
+          capabilities:
+            drop:
+            - ALL
+      - name: proxy
+        image: skyfloaiagent/proxy:v0.5.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http-proxy
+        env:
+        - name: APP_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: skyflo-version
+              key: VERSION
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      securityContext:
+        runAsNonRoot: false
+      terminationGracePeriodSeconds: 10
