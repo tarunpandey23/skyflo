@@ -8,7 +8,6 @@ This document describes the ways you can deploy Skyflo.ai and points to the righ
 |------|-------------|---------------|
 | **Kubernetes (Kustomize)** | Deploy to any Kubernetes cluster using manifests and Kustomize. Full control over namespace, replicas, images, and secrets. | [Kubernetes deployment](deployment-kubernetes.md) |
 | **Install script** | One-command install from the web (downloads manifests, prompts for LLM config, applies to cluster). | [Install guide](install.md#1-production-deployment) |
-| **Docker** | Run Skyflo.ai with Docker Compose or standalone containers. | _Coming soon_ |
 | **Helm** | Deploy using a Helm chart. | _Coming soon_ |
 
 
@@ -20,11 +19,6 @@ This document describes the ways you can deploy Skyflo.ai and points to the righ
 - `kubectl` installed and configured for your cluster.
 - For the **install script** only: `gettext` (for `envsubst`) and `curl`.
 - At least one LLM provider configured (e.g. OpenAI, Groq, Anthropic). See [install.md](install.md) and [deployment-kubernetes.md#secrets](deployment-kubernetes.md#secrets).
-
-### Docker
-
-- Docker and Docker Compose.  
-- _Docker deployment guide coming soon._
 
 ### Helm
 

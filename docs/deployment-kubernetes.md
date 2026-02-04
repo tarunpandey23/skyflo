@@ -126,7 +126,6 @@ After editing, run `kubectl apply -k deployment/kubernetes/` (or apply only the 
 
 ```yaml
 stringData:
-  # OPENAI_API_KEY: "sk-..."     # leave commented if not using OpenAI
   GROQ_API_KEY: "gsk-your-key"
   LLM_MODEL: "groq/llama-3.3-70b-versatile"
   JWT_SECRET: "your-base64-or-opaque-secret"
@@ -195,12 +194,30 @@ kubectl rollout restart deployment/skyflo-ai-ui -n skyflo-ai
    ```bash
    kubectl get pods -n skyflo-ai
    ```
+   When the deployment is healthy, you should see all pods in `Running` state with `READY` as expected (e.g. `1/1` or `2/2` for the UI):
+
+   ```
+   NAME                                    READY   STATUS    RESTARTS   AGE
+   skyflo-ai-controller-57469dcfdc-x477b   1/1     Running   0          88s
+   skyflo-ai-engine-5845bf5c7d-zvj8s       1/1     Running   0          88s
+   skyflo-ai-postgres-0                    1/1     Running   0          88s
+   skyflo-ai-redis-0                       1/1     Running   0          88s
+   skyflo-ai-ui-7c94df8f49-nc4dj           2/2     Running   0          88s
+   ```
+
+   - **skyflo-ai-controller** — Kubernetes controller for Skyflo custom resources  
+   - **skyflo-ai-engine** — API and agent (talks to Postgres, Redis, MCP, LLM)  
+   - **skyflo-ai-postgres-0** — PostgreSQL (StatefulSet)  
+   - **skyflo-ai-redis-0** — Redis (StatefulSet)  
+   - **skyflo-ai-ui** — UI + nginx proxy (2/2 = ui + proxy containers)
 
 5. **Access the UI (local)**  
    ```bash
    kubectl port-forward -n skyflo-ai svc/skyflo-ai-ui 3000:80
    ```  
-   Open `http://localhost:3000`.
+   Open `http://localhost:3000` in your browser. You should see the Skyflo login/welcome screen.
+
+   > **Screenshot:** _Add a screenshot of the Skyflo UI after port-forward here._
 
 For production, configure an [Ingress](#ingress-production).
 
@@ -365,14 +382,43 @@ For other Ingress controllers (nginx, traefik, etc.), use the same idea: Ingress
    - Check that Postgres and Redis are running and that `POSTGRES_DATABASE_URL` and `REDIS_URL` in engine-secrets match the postgres and redis services (e.g. `skyflo-ai-postgres:5432`, `skyflo-ai-redis:6379`).
    - Check engine logs: `kubectl logs deployment/skyflo-ai-engine -n skyflo-ai`.
 
-4. **LLM errors (401, 503, etc.)**  
-   - Confirm the API key in `config/secrets/engine-secrets.yaml` matches the provider for `LLM_MODEL`.
-   - Ensure only one provider key is set (or the one you intend is correct) and that the key is not commented out or empty.
+4. **Unable to send prompt or no response from the agent**  
+   The UI may load but sending a prompt does nothing or returns an error. In that case, **check the engine pod logs** — the LLM call runs in the engine and errors appear there:
 
-5. **Blank or invalid secrets**  
+   ```bash
+   kubectl logs deployment/skyflo-ai-engine -n skyflo-ai
+   # Or follow logs:
+   kubectl logs -f deployment/skyflo-ai-engine -n skyflo-ai
+   ```
+
+   **Common cause: invalid or missing LLM API key.** You may see an error like:
+
+   ```
+   ERROR - Error in model node: litellm.BadRequestError: GroqException - {"error":{"message":"Invalid API Key","type":"invalid_request_error","code":"invalid_api_key"}}
+   ...
+   httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'https://api.groq.com/openai/v1/chat/completions'
+   ```
+
+   This means:
+   - The **API key is missing** (not set in `config/secrets/engine-secrets.yaml`, or the key is commented out / empty), or  
+   - The **API key is wrong** (typo, expired, or for a different provider), or  
+   - The **provider does not match** `LLM_MODEL` (e.g. `LLM_MODEL` is `groq/llama-3.3-70b-versatile` but you set `OPENAI_API_KEY` instead of `GROQ_API_KEY`).
+
+   **Fix:** Edit `config/secrets/engine-secrets.yaml`, set the correct API key for your chosen `LLM_MODEL`, re-apply, and restart the engine:
+
+   ```bash
+   kubectl apply -k deployment/kubernetes/
+   kubectl rollout restart deployment/skyflo-ai-engine -n skyflo-ai
+   ```
+
+5. **LLM errors (401, 503, rate limit, etc.)**  
+   - Confirm the API key in `config/secrets/engine-secrets.yaml` matches the provider for `LLM_MODEL`.
+   - Ensure the key is not commented out or empty. Check engine logs (see above) for the exact error from the provider.
+
+6. **Blank or invalid secrets**  
    Comment out any unused key in `engine-secrets.yaml` so Kubernetes does not create empty secret entries. Re-apply after editing: `kubectl apply -k deployment/kubernetes/`.
 
-6. **Port-forward for local access**  
+7. **Port-forward for local access**  
    ```bash
    kubectl port-forward -n skyflo-ai svc/skyflo-ai-ui 3000:80
    ```
