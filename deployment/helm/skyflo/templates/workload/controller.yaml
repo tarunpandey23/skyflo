@@ -1,0 +1,90 @@
+{{- if .Values.controller }}
+{{- if .Values.controller.enabled }}
+{{- $global := index .Values "global" | default dict }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "skyflo.fullname" . }}-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skyflo.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.controller.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "skyflo.fullname" . }}-controller
+  template:
+    metadata:
+      labels:
+        app: {{ include "skyflo.fullname" . }}-controller
+        {{- with $global.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $global.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "skyflo.fullname" . }}-controller
+      {{- with $global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: manager
+        image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default (include "skyflo.version" .) }}"
+        imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+        env:
+        - name: APP_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: skyflo-version
+              key: VERSION
+        args:
+        - --leader-elect=false
+        - --metrics-bind-address=:8080
+        - --health-probe-bind-address=:8081
+        resources:
+          {{- toYaml .Values.controller.resources | nindent 10 }}
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        {{- with $global.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- with $global.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+      {{- with $global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

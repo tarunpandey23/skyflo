@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skyflo-mcp-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skyflo.labels" . | nindent 4 }}
+data:
+{{- $config := .Values.config | default dict }}
+{{- with $config.mcp }}
+  APP_NAME: {{ .APP_NAME | quote }}
+  APP_DESCRIPTION: {{ .APP_DESCRIPTION | quote }}
+  DEBUG: {{ .DEBUG | quote }}
+  LOG_LEVEL: {{ .LOG_LEVEL | quote }}
+  MAX_RETRY_ATTEMPTS: {{ .MAX_RETRY_ATTEMPTS | quote }}
+  RETRY_BASE_DELAY: {{ .RETRY_BASE_DELAY | quote }}
+  RETRY_MAX_DELAY: {{ .RETRY_MAX_DELAY | quote }}
+  RETRY_EXPONENTIAL_BASE: {{ .RETRY_EXPONENTIAL_BASE | quote }}
+{{- end }}

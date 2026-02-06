@@ -1,0 +1,27 @@
+{{- if .Values.engine }}
+{{- if .Values.engine.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skyflo-engine-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skyflo.labels" . | nindent 4 }}
+data:
+{{- with .Values.engine.config }}
+  APP_NAME: {{ .APP_NAME | quote }}
+  APP_DESCRIPTION: {{ .APP_DESCRIPTION | quote }}
+  DEBUG: {{ .DEBUG | quote }}
+  API_V1_STR: {{ .API_V1_STR | quote }}
+  LOG_LEVEL: {{ .LOG_LEVEL | quote }}
+  RATE_LIMITING_ENABLED: {{ .RATE_LIMITING_ENABLED | quote }}
+  RATE_LIMIT_PER_MINUTE: {{ .RATE_LIMIT_PER_MINUTE | quote }}
+  JWT_ALGORITHM: {{ .JWT_ALGORITHM | quote }}
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: {{ .JWT_ACCESS_TOKEN_EXPIRE_MINUTES | quote }}
+  JWT_REFRESH_TOKEN_EXPIRE_DAYS: {{ .JWT_REFRESH_TOKEN_EXPIRE_DAYS | quote }}
+  LLM_TEMPERATURE: {{ .LLM_TEMPERATURE | quote }}
+  LLM_MAX_ITERATIONS: {{ .LLM_MAX_ITERATIONS | quote }}
+  MCP_SERVER_URL: {{ if index $.Values "mcp" }}{{ if (index (index $.Values "mcp") "enabled") }}{{ printf "http://%s-mcp:%v" (include "skyflo.fullname" $) ((index $.Values "mcp").service.port | default 8888) | quote }}{{ else }}{{ .MCP_SERVER_URL | quote }}{{ end }}{{ else }}{{ .MCP_SERVER_URL | quote }}{{ end }}
+{{- end }}
+{{- end }}
+{{- end }}

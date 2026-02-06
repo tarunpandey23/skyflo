@@ -1,0 +1,92 @@
+{{- if .Values.engine }}
+{{- if .Values.engine.enabled }}
+{{- $global := index .Values "global" | default dict }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "skyflo.fullname" . }}-engine
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skyflo.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.engine.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "skyflo.fullname" . }}-engine
+  template:
+    metadata:
+      labels:
+        app: {{ include "skyflo.fullname" . }}-engine
+        {{- with $global.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $global.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with $global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $global.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: engine
+        image: "{{ .Values.engine.image.repository }}:{{ .Values.engine.image.tag | default (include "skyflo.version" .) }}"
+        imagePullPolicy: {{ .Values.engine.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.engine.service.port }}
+          name: http
+        envFrom:
+        - configMapRef:
+            name: skyflo-engine-config
+        - secretRef:
+            name: skyflo-engine-secrets
+        env:
+        - name: APP_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: skyflo-version
+              key: VERSION
+        - name: INTEGRATIONS_SECRET_NAMESPACE
+          value: {{ .Values.engine.integrationsSecretNamespace | default .Release.Namespace | quote }}
+        resources:
+          {{- toYaml .Values.engine.resources | nindent 10 }}
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: http
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: http
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        {{- with $global.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      terminationGracePeriodSeconds: 10
+      {{- with $global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $global.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $global.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}

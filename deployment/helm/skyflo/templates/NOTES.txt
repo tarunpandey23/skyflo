@@ -1,0 +1,26 @@
+Skyflo has been deployed to namespace {{ .Release.Namespace }}.
+
+QUICK START
+-----------
+1. Check that all pods are running:
+   kubectl get pods -n {{ .Release.Namespace }}
+
+2. Port-forward the UI to access it locally:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "skyflo.fullname" . }}-ui 3000:80
+
+3. Open in your browser:
+   http://localhost:3000
+
+OPTIONAL
+--------
+• Port-forward the Engine API (e.g. for direct API calls):
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "skyflo.fullname" . }}-engine 8080:8080
+  API base: http://localhost:8080/api/v1
+
+• View logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app={{ include "skyflo.fullname" . }}-engine -f
+
+• Uninstall:
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+For production, enable and configure the UI Ingress in values (ingress.enabled: true).

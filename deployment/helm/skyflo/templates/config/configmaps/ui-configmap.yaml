@@ -1,0 +1,20 @@
+{{- if .Values.ui }}
+{{- if .Values.ui.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: skyflo-ui-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skyflo.labels" . | nindent 4 }}
+data:
+{{- with .Values.ui.config }}
+  NEXT_PUBLIC_APP_NAME: {{ .NEXT_PUBLIC_APP_NAME | quote }}
+  NODE_ENV: {{ .NODE_ENV | quote }}
+  NEXT_PUBLIC_ENABLE_ANALYTICS: {{ .NEXT_PUBLIC_ENABLE_ANALYTICS | quote }}
+  NEXT_PUBLIC_ENABLE_FEEDBACK: {{ .NEXT_PUBLIC_ENABLE_FEEDBACK | quote }}
+  NEXT_PUBLIC_API_URL: {{ .NEXT_PUBLIC_API_URL | quote }}
+{{- end }}
+  API_URL: {{ include "skyflo.engineUrl" . | quote }}
+{{- end }}
+{{- end }}

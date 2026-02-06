@@ -1,0 +1,61 @@
+{{- if .Values.redis }}
+{{- if .Values.redis.enabled }}
+{{- $global := index .Values "global" | default dict }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "skyflo.fullname" . }}-redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "skyflo.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "skyflo.fullname" . }}-redis-headless
+  replicas: {{ .Values.redis.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "skyflo.fullname" . }}-redis
+  template:
+    metadata:
+      labels:
+        app: {{ include "skyflo.fullname" . }}-redis
+    spec:
+      {{- with $global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: redis
+        image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
+        imagePullPolicy: {{ .Values.redis.image.pullPolicy }}
+        ports:
+        - containerPort: 6379
+          name: redis
+        resources:
+          {{- toYaml .Values.redis.resources | nindent 10 }}
+        livenessProbe:
+          exec:
+            command: [redis-cli, ping]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command: [redis-cli, ping]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        command:
+        - redis-server
+        - --appendonly
+        - "yes"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: {{ .Values.redis.persistence.size }}
+{{- end }}
+{{- end }}

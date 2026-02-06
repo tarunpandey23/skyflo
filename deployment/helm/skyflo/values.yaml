@@ -1,0 +1,239 @@
+# Default values for the Skyflo Helm chart.
+# Override with -f my-values.yaml or --set. Required: postgresSecret.password, engine.secret.JWT_SECRET,
+# and at least one engine.secret API key (e.g. OPENAI_API_KEY) for your LLM provider.
+# See docs/deployment-helm.md for full reference.
+
+global:
+  # App version; used in version ConfigMap and as default image tag.
+  version: "v0.5.0"
+  # Install SkyfloAI CustomResourceDefinition when true.
+  installCRD: false
+  # Optional: override chart/release naming and namespace.
+  nameOverride: ""
+  fullnameOverride: ""
+  namespace: ""
+  # Optional: shared pod and scheduling settings.
+  imagePullSecrets: []
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []
+  podSecurityContext: {}
+  securityContext: {}
+
+# --- Controller (Kubernetes operator for SkyfloAI CRs) ---
+controller:
+  enabled: true
+  replicas: 1
+  image:
+    repository: skyfloaiagent/k8s-controller
+    tag: ""   # defaults to global.version
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# --- Redis (StatefulSet) ---
+redis:
+  enabled: true
+  replicas: 1
+  image:
+    repository: redis
+    tag: "7.4.7-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  persistence:
+    size: 1Gi
+
+# --- Postgres (StatefulSet) ---
+postgres:
+  enabled: true
+  replicas: 1
+  image:
+    repository: postgres
+    tag: "15.15-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  persistence:
+    size: 5Gi
+
+# -----------------------------------------------------------------------------
+# Secrets (do not commit real values; use -f secrets.yaml or --set)
+# -----------------------------------------------------------------------------
+# Postgres credentials → Secret: skyflo-postgres-secrets
+postgresSecret:
+  user: skyflo
+  password: changeme          # REQUIRED: set a strong password in production
+  database: skyflo
+  port: "5432"
+
+
+# --- Engine (core API) ---
+engine:
+  enabled: true
+  replicas: 1
+  image:
+    repository: skyfloaiagent/engine
+    tag: ""   # defaults to global.version
+    pullPolicy: IfNotPresent
+  service:
+    port: 8080
+  # In-cluster URLs when engine.secret.POSTGRES_DATABASE_URL / REDIS_URL are empty.
+  # Use same password as postgresSecret.password so the engine can connect.
+  defaultUrls:
+    POSTGRES_DATABASE_URL: "postgres://skyflo:changeme@skyflo-ai-postgres:5432/skyflo"
+    REDIS_URL: "redis://skyflo-ai-redis:6379/0"
+  config:
+    APP_NAME: "Skyflo"
+    APP_DESCRIPTION: "Skyflo AI platform"
+    DEBUG: "false"
+    API_V1_STR: "/api/v1"
+    LOG_LEVEL: "INFO"
+    RATE_LIMITING_ENABLED: "true"
+    RATE_LIMIT_PER_MINUTE: "60"
+    JWT_ALGORITHM: "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: "7"
+    LLM_TEMPERATURE: "0.7"
+    LLM_MAX_ITERATIONS: "10"
+    MCP_SERVER_URL: "http://skyflo-ai-mcp:8888"   # overridden by chart when mcp.enabled is true
+  # Secret → skyflo-engine-secrets (only non-empty keys are added).
+  # REQUIRED: JWT_SECRET, LLM_MODEL, and one LLM provider API key. Leave POSTGRES_DATABASE_URL and REDIS_URL empty to use defaultUrls.
+  secret:
+    JWT_SECRET: ""
+    LLM_MODEL: "groq/moonshotai/kimi-k2-instruct-0905"
+    LLM_HOST: ""
+    POSTGRES_DATABASE_URL: ""
+    REDIS_URL: ""
+    OPENAI_API_KEY: ""
+    ANTHROPIC_API_KEY: ""
+    AZURE_API_KEY: ""
+    GEMINI_API_KEY: ""
+    COHERE_API_KEY: ""
+    MISTRAL_API_KEY: ""
+    GROQ_API_KEY: ""
+    ANYSCALE_API_KEY: ""
+    OPENROUTER_API_KEY: ""
+    PERPLEXITYAI_API_KEY: ""
+    FIREWORKS_AI_API_KEY: ""
+    TOGETHERAI_API_KEY: ""
+    DEEPINFRA_API_KEY: ""
+    AI21_API_KEY: ""
+    NLP_CLOUD_API_KEY: ""
+    REPLICATE_API_KEY: ""
+    HF_TOKEN: ""
+    DATABRICKS_TOKEN: ""
+    CLARIFAI_PAT: ""
+    VOYAGE_API_KEY: ""
+    JINAAI_API_KEY: ""
+    ALEPHALPHA_API_KEY: ""
+    BASETEN_API_KEY: ""
+    SAMBANOVA_API_KEY: ""
+    FEATHERLESS_AI_API_KEY: ""
+    OLLAMA_API_KEY: ""
+    IBM_API_KEY: ""
+    PREDIBASE_API_KEY: ""
+    NVIDIA_NGC_API_KEY: ""
+    XAI_API_KEY: ""
+    VOLCENGINE_API_KEY: ""
+    AWS_ACCESS_KEY_ID: ""
+    AWS_SECRET_ACCESS_KEY: ""
+    AWS_REGION_NAME: ""
+  integrationsSecretNamespace: ""   # defaults to release namespace
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+# --- MCP server (Kubernetes/Helm tools for Sky agent; required for "get_cluster_info", "get_resources", etc.) ---
+mcp:
+  enabled: true
+  replicas: 1
+  image:
+    repository: skyfloaiagent/mcp
+    tag: ""   # defaults to global.version
+    pullPolicy: IfNotPresent
+  service:
+    port: 8888
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+
+# --- UI (web UI + proxy) ---
+ui:
+  enabled: true
+  replicas: 1
+  image:
+    repository: skyfloaiagent/ui
+    tag: ""   # defaults to global.version
+    pullPolicy: IfNotPresent
+  proxyImage:
+    repository: skyfloaiagent/proxy
+    tag: ""   # defaults to global.version
+    pullPolicy: IfNotPresent
+  service:
+    port: 80        # Service port for proxy (targetPort: http-proxy)
+    uiPort: 3000    # Service port for UI app (targetPort: http)
+  config:
+    NEXT_PUBLIC_APP_NAME: "Skyflo"
+    NODE_ENV: "production"
+    NEXT_PUBLIC_ENABLE_ANALYTICS: "false"
+    NEXT_PUBLIC_ENABLE_FEEDBACK: "false"
+    NEXT_PUBLIC_API_URL: ""   # API_URL is injected by the chart from engine service URL
+  resources:
+    ui:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    proxy:
+      limits:
+        cpu: 200m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+# --- Ingress (UI only) ---
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  # Example:
+  # hosts:
+  #   - host: skyflo.example.com
+  #     paths:
+  #       - path: /
+  #         pathType: Prefix
+  tls: []
+
+# --- MCP ConfigMap (skyflo-mcp-config; optional env for MCP server) ---
+config:
+  mcp: {}

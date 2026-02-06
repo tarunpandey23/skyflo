@@ -1,0 +1,30 @@
+apiVersion: v2
+name: skyflo
+description: Helm chart for Skyflo.ai — mirrors deployment/kubernetes/ (controller, engine, ui, redis, postgres; ingress for UI only)
+
+# A chart can be either an 'application' or a 'library' chart.
+# Application charts are a collection of templates that can be packaged into versioned archives
+# to be deployed.
+type: application
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates. Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.1.0
+
+# This is the version number of the application being deployed (e.g. Skyflo v0.5.0).
+# It is recommended to use it with quotes.
+appVersion: "0.5.0"
+home: https://skyflo.ai
+icon: https://skyflo.ai/logo.svg
+maintainers:
+  - name: Skyflo.ai
+    email: support@skyflo.ai
+    url: https://skyflo.ai
+sources:
+  - https://github.com/skyflo-ai/skyflo
+keywords:
+  - skyflo
+  - ai
+  - devops
+  - kubernetes
+  - mcp
