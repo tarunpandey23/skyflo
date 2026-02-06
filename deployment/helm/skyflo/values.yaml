@@ -118,7 +118,7 @@ engine:
   # REQUIRED: JWT_SECRET, LLM_MODEL, and one LLM provider API key. Leave POSTGRES_DATABASE_URL and REDIS_URL empty to use defaultUrls.
   secret:
     JWT_SECRET: ""
-    LLM_MODEL: "groq/moonshotai/kimi-k2-instruct-0905"
+    LLM_MODEL: ""
     LLM_HOST: ""
     POSTGRES_DATABASE_URL: ""
     REDIS_URL: ""
