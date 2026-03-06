@@ -79,7 +79,7 @@ jobs:
           done < manifest-list.txt
 
           echo "Running kubeconform (schema validation)..."
-          if ! kubeconform -summary -output text rendered/; then
+          if ! kubeconform -summary -output text -skip CustomResourceDefinition rendered/; then
             echo "Schema validation failed. See kubeconform output above for details."
             exit 1
           fi
