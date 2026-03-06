@@ -1,0 +1,94 @@
+name: Deployment
+
+on:
+  pull_request:
+    paths:
+      - 'deployment/**'
+      - '.github/workflows/deployment-ci.yml'
+
+concurrency:
+  group: deployment-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  KUBECONFORM_VERSION: v0.7.0
+  KUBESCORE_VERSION: v1.20.0
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${{ env.KUBECONFORM_VERSION }}/kubeconform-linux-amd64.tar.gz" | tar -xz
+          sudo mv kubeconform /usr/local/bin/
+          kubeconform -v
+
+      - name: Install kube-score
+        run: |
+          curl -sSL "https://github.com/zegl/kube-score/releases/download/${{ env.KUBESCORE_VERSION }}/kube-score_${KUBESCORE_VERSION#v}_linux_amd64.tar.gz" | tar -xz
+          (test -f kube-score && sudo mv kube-score /usr/local/bin/) || sudo mv kube-score_*_linux_amd64 /usr/local/bin/kube-score
+          kube-score version
+
+      - name: Prepare manifest list
+        id: manifests
+        run: |
+          # Exclude Docker Compose and Kind cluster config (non-standard K8s schema)
+          find deployment -type f \( -name '*.yaml' -o -name '*.yml' \) | while read -r f; do
+            case "$f" in
+              deployment/local.docker-compose.yaml) ;;
+              deployment/local.kind.yaml) ;;
+              *) echo "$f" ;;
+            esac
+          done | sort -u > manifest-list.txt
+          echo "Files to validate:"
+          cat manifest-list.txt
+
+      - name: Render and validate with kubeconform
+        run: |
+          set -e
+          mkdir -p rendered
+          export NAMESPACE="ci-namespace"
+          export VERSION="v0.0.0-ci"
+          export MCP_SERVER_URL="http://ci-mcp:8080"
+          export INTEGRATIONS_SECRET_NAMESPACE="ci-namespace"
+          # Dummy values for all envsubst placeholders in deployment manifests
+          for v in OPENAI_API_KEY ANTHROPIC_API_KEY AZURE_API_KEY GEMINI_API_KEY COHERE_API_KEY \
+            MISTRAL_API_KEY GROQ_API_KEY ANYSCALE_API_KEY OPENROUTER_API_KEY PERPLEXITYAI_API_KEY \
+            FIREWORKS_AI_API_KEY TOGETHERAI_API_KEY DEEPINFRA_API_KEY AI21_API_KEY NLP_CLOUD_API_KEY \
+            REPLICATE_API_KEY HF_TOKEN DATABRICKS_TOKEN CLARIFAI_PAT VOYAGE_API_KEY JINAAI_API_KEY \
+            ALEPHALPHA_API_KEY BASETEN_API_KEY SAMBANOVA_API_KEY FEATHERLESS_AI_API_KEY OLLAMA_API_KEY \
+            IBM_API_KEY PREDIBASE_API_KEY NVIDIA_NGC_API_KEY XAI_API_KEY VOLCENGINE_API_KEY MOONSHOT_API_KEY \
+            AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION_NAME LLM_MODEL LLM_HOST JWT_SECRET \
+            POSTGRES_DATABASE_URL REDIS_URL POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB POSTGRES_PORT; do
+            export "${v}=ci-placeholder"
+          done
+
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            out="rendered/$(echo "$f" | tr '/' '_')"
+            if grep -q '\${' "$f"; then
+              envsubst < "$f" > "$out"
+            else
+              cp "$f" "$out"
+            fi
+          done < manifest-list.txt
+
+          echo "Running kubeconform (schema validation)..."
+          if ! kubeconform -summary -output text rendered/; then
+            echo "Schema validation failed. See kubeconform output above for details."
+            exit 1
+          fi
+          echo "Schema validation passed."
+
+      - name: Run kube-score (best practices, warnings only)
+        run: |
+          # kube-score may exit 1 on recommendations; we only want to report, not fail the job
+          kube-score score rendered/ --output-format sarif > kube-score.sarif 2>/dev/null || true
+          kube-score score rendered/ --output-format text --ignore-container-cpu-limit --ignore-container-memory-limit || true
+          echo "Best-practice checks completed (see above for any warnings)."
+        continue-on-error: true
