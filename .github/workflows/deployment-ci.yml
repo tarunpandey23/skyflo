@@ -1,0 +1,105 @@
+name: Deployment
+
+on:
+  pull_request:
+    paths:
+      - 'deployment/**'
+      - '.github/workflows/deployment-ci.yml'
+
+concurrency:
+  group: deployment-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  KUBECONFORM_VERSION: v0.7.0
+  KUBESCORE_VERSION: v1.20.0
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Kubeconform
+        run: |
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${{ env.KUBECONFORM_VERSION }}/kubeconform-linux-amd64.tar.gz" | tar -xz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Setup Kube-score
+        run: |
+          curl -sSL "https://github.com/zegl/kube-score/releases/download/${{ env.KUBESCORE_VERSION }}/kube-score_${KUBESCORE_VERSION#v}_linux_amd64.tar.gz" | tar -xz
+          (test -f kube-score && sudo mv kube-score /usr/local/bin/) || sudo mv kube-score_*_linux_amd64 /usr/local/bin/kube-score
+
+      - name: Validate manifests
+        run: |
+          set -e
+
+          # 1. Pick which YAML files to validate (skip docker-compose and kind config)
+          find deployment -type f \( -name '*.yaml' -o -name '*.yml' \) \
+            ! -path '*/local.docker-compose.yaml' ! -path '*/local.kind.yaml' \
+            -print0 | sort -z > manifest-list.txt
+          mkdir -p rendered
+
+          # 2. Set dummy env vars so ${VAR} in manifests can be replaced
+          export NAMESPACE="ci-namespace" VERSION="v0.0.0-ci"
+          export MCP_SERVER_URL="http://ci-mcp:8080" INTEGRATIONS_SECRET_NAMESPACE="ci-namespace"
+          while read -r v; do
+            export "${v}=${!v:-ci-placeholder}"
+          done < <(find deployment -type f \( -name '*.yaml' -o -name '*.yml' \) \
+            ! -path '*/local.docker-compose.yaml' ! -path '*/local.kind.yaml' \
+            -exec grep -ohE '\$\{[A-Za-z0-9_]+\}' {} + 2>/dev/null | sed 's/[${}]//g' | sort -u)
+
+          # 3. Render: replace ${VAR} and write to rendered/
+          while IFS= read -r -d '' f; do
+            out="rendered/$(echo "$f" | tr '/' '_')"
+            if grep -q '\${' "$f"; then
+              envsubst < "$f" > "$out"
+            else
+              cp "$f" "$out"
+            fi
+          done < manifest-list.txt
+
+          # 4. Run schema validation (kubeconform)
+          # On failure: prints each invalid resource and "Summary: N resources - Valid: X, Invalid: Y, Errors: Z"
+          kubeconform -summary -output text -skip CustomResourceDefinition rendered/ 2>&1 | tee kubeconform-output.txt
+          echo ${PIPESTATUS[0]} > validation-exitcode.txt
+
+          # 5. Fail the step if validation failed
+          [ "$(cat validation-exitcode.txt)" -eq 0 ] || exit 1
+
+      - name: Kube-score
+        run: |
+          kube-score score $(find rendered -type f \( -name '*.yaml' -o -name '*.yml' \) | tr '\n' ' ') --output-format human --color never --ignore-container-cpu-limit --ignore-container-memory-limit 2>&1 | tee kube-score-output.txt || true
+        continue-on-error: true
+
+      - name: Prepare PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const read = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } };
+            const noColors = (s) => (s || '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+
+            const passed = (read('validation-exitcode.txt').trim() || '1') === '0';
+            const kubeconform = noColors(read('kubeconform-output.txt'));
+            const kubeScore = noColors(read('kube-score-output.txt'));
+
+            const validation = passed
+              ? '## Deployment validation passed\n\nManifests in `deployment/` are valid.'
+              : '## Deployment validation failed\n\n```\n' + (kubeconform.match(/.*failed validation.*|Summary:.*/gm)?.join('\n') || kubeconform) + '\n```';
+
+            const scoreSection = '\n\n<details><summary><strong>Kube-score</strong> — click to expand</summary>\n\n```\n' + (kubeScore.trim() || 'No output.') + '\n```\n\n</details>';
+
+            fs.writeFileSync('deployment-validation.md', validation + scoreSection);
+
+      - name: Comment deployment validation on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: deployment-validation.md
+          header: "deployment-validation"
