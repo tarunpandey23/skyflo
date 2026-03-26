@@ -166,6 +166,20 @@ ui:
     apiUrl: ""
     publicApiUrl: "/api/v1"
 
+
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    labels: {}
+    servicePortName: http
+    hosts: []
+    #  - host: skyflo.example.com
+    tls: []
+    #  - secretName: skyflo-tls
+    #    hosts:
+    #      - skyflo.example.com
+
 # -- Kubernetes Controller (Go operator for SkyfloAI CRD)
 controller:
   image:

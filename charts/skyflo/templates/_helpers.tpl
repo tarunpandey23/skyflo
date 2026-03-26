@@ -61,6 +61,14 @@ Default image tag: component tag > global tag > v<appVersion>.
 {{- printf "%s-ui" (include "skyflo.fullname" .) }}
 {{- end }}
 
+
+{{- define "skyflo.ui.ingressName" -}}
+{{- $suffix := "-ui-ingress" }}
+{{- $base := include "skyflo.fullname" . }}
+{{- $max := int (sub 63 (len $suffix)) }}
+{{- printf "%s%s" (trunc $max $base | trimSuffix "-") $suffix }}
+{{- end }}
+
 {{- define "skyflo.controller.fullname" -}}
 {{- printf "%s-controller" (include "skyflo.fullname" .) }}
 {{- end }}
