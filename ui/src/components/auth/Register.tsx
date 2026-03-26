@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { AuthInput } from "./AuthInput";
 import { MdLock, MdEmail, MdPerson } from "react-icons/md";
 import { handleRegistration } from "@/lib/auth";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export const Register = () => {
+  const { login } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -28,7 +30,8 @@ export const Register = () => {
     const result = await handleRegistration(formData);
 
     if (result && result.success) {
-      router.push("/login");
+      login(result.user, null);
+      router.push("/");
     } else {
       setError(result?.error || "Registration failed");
     }

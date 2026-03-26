@@ -121,13 +121,21 @@ export async function handleRegistration(
       }
     );
 
-    if (response.ok) {
-      const userData = await response.json();
-
-      return { success: true, user: userData, token: "" };
-    } else {
+    if (!response.ok) {
       return { success: false, error: "Registration failed" };
     }
+
+    const loginResult = await handleLogin(formData);
+    if (!loginResult.success) {
+      return {
+        success: false,
+        error:
+          loginResult.error ||
+          "Account was created but automatic sign-in failed. Please go to the login page and sign in with the same email and password.",
+      };
+    }
+
+    return loginResult;
   } catch (error) {
     return { success: false, error: "Error during registration" };
   }
