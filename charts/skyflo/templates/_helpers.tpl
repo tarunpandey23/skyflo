@@ -201,3 +201,34 @@ Default image tag: component tag > global tag > v<appVersion>.
 {{- define "skyflo.integrationsSecretNamespace" -}}
 {{- .Values.engine.secrets.integrationsSecretNamespace | default .Release.Namespace }}
 {{- end }}
+
+{{/*
+PodDisruptionBudget body shared by component PDB templates.
+
+Expects a dict:
+  root: chart root context (.)
+  config: component podDisruptionBudget values (enabled, minAvailable, maxUnavailable)
+  fullname: resolved component full name string (same as matchLabels app)
+*/}}
+{{- define "skyflo.podDisruptionBudget" -}}
+{{- $root := index . "root" }}
+{{- $c := index . "config" }}
+{{- $fullname := index . "fullname" }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-pdb
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    {{- include "skyflo.labels" $root | nindent 4 }}
+    app: {{ $fullname }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $fullname }}
+  {{- if and (hasKey $c "maxUnavailable") (ne $c.maxUnavailable nil) }}
+  maxUnavailable: {{ $c.maxUnavailable | quote }}
+  {{- else }}
+  minAvailable: {{ $c.minAvailable | default 1 | quote }}
+  {{- end }}
+{{- end }}
