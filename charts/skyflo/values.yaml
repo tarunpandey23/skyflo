@@ -195,6 +195,34 @@ controller:
       cpu: 500m
       memory: 128Mi
 
+# PodDisruptionBudgets (engine, mcp, ui, controller) apply only to voluntary disruptions
+# such as node drains and cluster upgrades
+# They do not affect scaling behavior or replica counts
+
+# Use in production or HA setups where availability during maintenance is required
+# Ensure the component has at least 2 replicas before enabling a PDB
+
+# Per component, configure either minAvailable (default here)
+# or maxUnavailable (only one can be set, they are mutually exclusive)
+
+# Example alternatives:
+# maxUnavailable: 1
+# maxUnavailable: "25%"
+
+podDisruptionBudget:
+  engine:
+    enabled: false
+    minAvailable: 1
+  mcp:
+    enabled: false
+    minAvailable: 1
+  ui:
+    enabled: false
+    minAvailable: 1
+  controller:
+    enabled: false
+    minAvailable: 1
+
 # -- Built-in PostgreSQL (disable to use an external instance)
 postgresql:
   enabled: true

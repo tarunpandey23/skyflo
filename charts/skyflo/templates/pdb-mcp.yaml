@@ -1,0 +1,4 @@
+{{- $c := index (.Values.podDisruptionBudget | default dict) "mcp" | default dict }}
+{{- if $c.enabled }}
+{{- include "skyflo.podDisruptionBudget" (dict "root" $ "config" $c "fullname" (include "skyflo.mcp.fullname" .)) }}
+{{- end }}
