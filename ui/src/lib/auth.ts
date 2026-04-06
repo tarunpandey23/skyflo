@@ -122,9 +122,16 @@ export async function handleRegistration(
     );
 
     if (response.ok) {
-      const userData = await response.json();
+      await response.json().catch(() => undefined);
 
-      return { success: true, user: userData, token: "" };
+      const loginResult = await handleLogin(formData);
+      if (loginResult.success) {
+        return loginResult;
+      }
+      return {
+        success: false,
+        error: `Account created, but sign-in did not finish. Use the same email and password on the sign-in page. (${loginResult.error})`,
+      };
     } else {
       return { success: false, error: "Registration failed" };
     }
